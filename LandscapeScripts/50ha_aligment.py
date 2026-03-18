@@ -55,6 +55,12 @@ if not os.path.exists(path_local_mean):
 if not os.path.exists(path_vertical):
     os.makedirs(path_vertical)
 
+################## CUT THE LIDAR ORTHOMOSAIC TO THE 50HA PLOT AND COMBINE IT WITH THE DTM AND DEM ##################
+# Lidar comes from ??
+# DTM  comes from ??
+# DEM comes from ??
+# DTM and DEM are resampled to match lidar and everything is cropped to the 50ha plot 
+
 #read the 50ha shape file and transform it to UTM 17N
 BCI_50ha_shapefile = os.path.join(path_aux, "BCI_Plot_50ha.shp")
 BCI_50ha = gpd.read_file(BCI_50ha_shapefile)
@@ -150,9 +156,13 @@ with rasterio.open(output_lidar_mosaic_50ha_cropped_DTM_DEM, 'w', **ortho_meta_l
     dst.write(new_ortho_data_lidar)
 
 
-
 #whole island combined dsm and orthomosaic function def
 
+
+####################### Add DSM as a fourth band to each orthomosaic #################################
+# Orthomosaics are RGB ?
+# From the photogrametry a DSM is generated, here we add it as a fourth band to the orthomosaic. ?
+# Ensuring that the DSM and the orthomosaics will be aligned.  ?
 
 
 #combine the DSM and the orthomosaic
@@ -202,9 +212,15 @@ for product in products:
             dest.write(out_image)
     print("finish cropping the products", product)
 
+
 print("finish cropping the products")
 print("Starting the aligment process")
 start_time = time.time() 
+
+######################################## Align a reference orthomosaic with the lidar ######################################################
+### 2023/05/23 is used as the reference orthomosaic image (refered her as photogrammetry orthomosaic). Because ??? (is it the closest taken to the lidar?)
+### This reference orthomosaic is aligned to the lidar. Using the green band of both images. 
+
 
 # Define the path to the working directory
 wd_path = r"/home/vasquezv/BCI_50ha"
@@ -221,7 +237,9 @@ closest_date_path=os.path.join(wd_path,'Product_cropped',closest_date)
 target=os.path.join(wd_path,'Product_cropped',closest_date)
 reference=lidar_orthomosaic
 
-#locally correct the photogrammetry orthomosaic closer to the lidar
+
+#LOCALLY correct the photogrammetry orthomosaic closer to the lidar. 
+# Using windows of a fixed size the function COREG_LOCAL calculates a XY shift vector for each window. 
 print("starting the local correction")
 if not os.path.exists(os.path.join(wd_path,'Product_local')):
     os.makedirs(os.path.join(wd_path,'Product_local'))
@@ -243,7 +261,10 @@ CRL.calculate_spatial_shifts()
 CRL.correct_shifts()
 
 
-#globally correct the photogrammetry orthomosaic with the closest date to the lidar
+# GLOBALLY correct the photogrammetry orthomosaic with the closest date to the lidar
+# Using the best 10 windows from the local correction, Find the best one that does not produce a RuntimeError
+# And calculate the XY shift from the 1024 x 1024 window centered on the best window. Apply this shift to the whole orthomosaic.
+
 if not os.path.exists(os.path.join(wd_path,'Product_global')):
     os.makedirs(os.path.join(wd_path,'Product_global'))
 
@@ -278,8 +299,16 @@ for i in range(0,len(points)):
             continue  # Go to the next iteration if RuntimeError
 print('finish the global alignment of first orthomosaic')
 
+############################ ALIGNMENT OF THE REST OF THE ORTHOMOSAICS TO THE FIRST ALIGNED ORTHOMOSAIC (2023/05/23) #################
+# Now three things are done for the rest of the orthomosaics:
+# 1. Local aligment using a fixed size window size. 
+# 2. Global aligment using the best window from the local aligment.
+# 3. Deshift the photogrammetry orthomosaic by applying the mean shift of the best local aligment ???? (For what?)
 
-#Listing can be done regularly with os.lisdir(), however I needed to be absolutly sure that they were in the right order
+# The order of the aligment backwards and forward starting from the reference orthomosaics, the next is aligned, and then the next uses the previous one as reference. 
+
+
+#Listing can be done regularly with os.lisdir(), however I needed to be absolutely sure that they were in the right order
 list_of_files =  [f for f in os.listdir(os.path.join(wd_path,'Product_cropped')) if f.endswith('.tif')]
 dates_files = [(datetime.strptime(f[9:19], '%Y_%m_%d'), f) for f in list_of_files if f.endswith('.tif')]
 dates_files.sort()
@@ -423,6 +452,11 @@ end_time = time.time()  # Stop the timer
 elapsed_time = end_time - start_time  # Calculate the elapsed time
 print("Time taken: {} seconds in aligment".format(elapsed_time))
 
+
+
+######################################################### VERTICAL ALIGMENT ###############################################################
+
+# Next the height values of the photogrammetry orthomosaics are aligned. That is the 4th (DSM) band added at the start of the script
 
 #start the vertical aligment of the global products
 print("starting the vertical alignment")

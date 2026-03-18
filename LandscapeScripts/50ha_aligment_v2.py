@@ -33,6 +33,13 @@ BCI_50ha = gpd.read_file(BCI_50ha_shapefile)
 BCI_50ha.to_crs(epsg=32617, inplace=True)
 BCI_50ha_buffer = box(BCI_50ha.bounds.minx-30, BCI_50ha.bounds.miny-30, BCI_50ha.bounds.maxx+30, BCI_50ha.bounds.maxy+30)  # Create a buffer around the plot
 
+
+####################### Add DSM as a fourth band to each orthomosaic #################################
+# Orthomosaics are RGB ?
+# From the photogrametry a DSM is generated, here we add it as a fourth band to the orthomosaic. ?
+# Ensuring that the DSM and the orthomosaics will be aligned.  ?
+
+
 ortho_list = [file for file in os.listdir(ortho_path) if file.endswith(".tif")]
 dsm_list= [file for file in os.listdir(dsm_path) if file.endswith(".tif")]  
 
@@ -55,7 +62,12 @@ for product in product_list:
     else:
         print(f"Skipping {product} because it already exists")
 
-#GLOBAL ALIGNMENT
+
+############################ GLOBAL ALIGNMENT ####################################################### #################
+# Global aligment using a reference, if no successfull alignment is achieved with the reference, 
+# the next successful alignment is used as reference.
+
+# The order of the aligment goes backwards and forward starting from the reference orthomosaics
 
 reference1= os.path.join(cropped_path, ortho_list[69])
 print("the referece is", reference1)
@@ -128,6 +140,13 @@ for orthomosaic in ortho_list[70:]:
             except:
                 print("Global alignment failed, retrying with the previous successful alignment")
                 reference1 = os.path.join(wd_path,"Product_global",successful_alignments.pop()) # Use the last successful alignment as reference
+
+
+
+############################ LOCAL ALIGNMENT ####################################################### #################
+# Running local alignment o top of global alignment. 
+# Using windows of a fixed size the function COREG_LOCAL calculates a XY shift vector for each window. 
+
 
 #LOCAL ALIGNMENT
 from tqdm import tqdm
@@ -512,6 +531,14 @@ for date in sorted_files[70:]:
 #try both approaches, one for all to the main one and the other for the res
 print("finish forward aligment")
 
+
+
+######################################################### VERTICAL ALIGMENT ###############################################################
+# First the refernce ortjomosaic is aligned vertically to the lidar orthomosaic.
+# Then the rest of the photogrammetry orthomosaics are aligned vertically to the reference photogrammetry orthomosaic. 
+# To do this the difference of the median of the DEM values between the reference photogrammetry orthomosaic and the lidar orthomosaic is calculated
+# And this difference is added or subtracted to the rest of the photogrammetry orthomosaics.
+# Since the aligment is done with respect to the reference that is the previous date, the difference should be small. 
 
 
 ##local vertical alignment
